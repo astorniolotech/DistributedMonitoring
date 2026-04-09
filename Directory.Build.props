@@ -1,6 +1,8 @@
-<PropertyGroup>
-  <LangVersion>12</LangVersion>
-  <Nullable>enable</Nullable>
-  <ImplicitUsings>enable</ImplicitUsings>
-  <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
-</PropertyGroup>
+<Project>
+  <PropertyGroup>
+    <LangVersion>12</LangVersion>
+    <Nullable>enable</Nullable>
+ <ImplicitUsings>enable</ImplicitUsings>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+ </PropertyGroup>
+</Project>
