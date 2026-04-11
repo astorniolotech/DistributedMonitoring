@@ -73,7 +73,7 @@ public class AlarmService
         {
             var alarm = new Alarm
             {
-                Id = DateTime.Now.Ticks,
+                Id = (int)DateTime.Now.Ticks,
                 Type = type,
                 Level = level,
                 NodeId = nodeId,

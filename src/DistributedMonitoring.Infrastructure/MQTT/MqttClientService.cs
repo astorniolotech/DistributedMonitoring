@@ -1,6 +1,7 @@
 using DistributedMonitoring.Domain.Interfaces;
 using MQTTnet;
 using MQTTnet.Client;
+using MQTTnet.Protocol;
 using System.Text;
 
 namespace DistributedMonitoring.Infrastructure.MQTT;
@@ -44,7 +45,7 @@ public class MqttClientService : IMqttClientService, IDisposable
                 .WithTcpServer(config.Broker.Host, config.Broker.Port)
                 .WithClientId(config.Broker.ClientId)
                 .WithCleanSession()
-                .WithKeepAlive(TimeSpan.FromSeconds(30))
+                .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
                 .Build();
 
             _mqttClient.ApplicationMessageReceivedAsync += OnMessageReceivedAsync;

@@ -1,5 +1,6 @@
 using DistributedMonitoring.Domain.Interfaces;
 using System.IO.Ports;
+using System.Text;
 
 namespace DistributedMonitoring.Infrastructure.USB;
 

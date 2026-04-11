@@ -1,8 +1,10 @@
 using DistributedMonitoring.Application.Services;
 using DistributedMonitoring.Domain.Interfaces;
 using DistributedMonitoring.Infrastructure.USB;
-using System.Drawing;
+using Microsoft.Extensions.DependencyInjection;
 using System.Windows.Forms;
+using System.Windows.Forms.VisualStyles;
+
 
 namespace DistributedMonitoring.Presentation;
 
@@ -122,7 +124,7 @@ public partial class MainForm : Form
             Padding = new Padding(10, 5, 10, 5)
         };
 
-        var buttons = new[]
+        var buttons = new (string Text, EventHandler Handler)[]
         {
             ("Inicializar", OnInitializeNodes),
             ("Configurar", OnConfigure),
@@ -207,7 +209,7 @@ public partial class MainForm : Form
             Dock = DockStyle.Fill,
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 12),
-            TextAlign = ContentAlignment.MiddleLeft
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft
         };
 
         _silenceButton = new Button
@@ -261,7 +263,7 @@ public partial class MainForm : Form
             Text = "Puerto:",
             AutoSize = true,
             Margin = new Padding(0, 0, 10, 0),
-            VerticalAlignment = VerticalAlignment.Center
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft
         };
 
         _portCombo = new ComboBox
@@ -326,7 +328,7 @@ public partial class MainForm : Form
             Text = "Estado: Cerrado | Registros: 0",
             AutoSize = true,
             Margin = new Padding(20, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft
         };
 
         recordPanel.Controls.Add(_startRecordButton);
@@ -365,7 +367,7 @@ public partial class MainForm : Form
             Text = "MQTT: Desconectado",
             ForeColor = Color.LightGray,
             Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleLeft,
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
             Padding = new Padding(10, 0, 0, 0)
         };
 
@@ -374,7 +376,7 @@ public partial class MainForm : Form
             Text = "Nodos: 0",
             ForeColor = Color.LightGray,
             Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter
+            TextAlign = System.Drawing.ContentAlignment.MiddleCenter
         };
 
         _lastUpdateLabel = new Label
@@ -382,7 +384,7 @@ public partial class MainForm : Form
             Text = "Última actualización: --",
             ForeColor = Color.LightGray,
             Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleRight,
+            TextAlign = System.Drawing.ContentAlignment.MiddleRight,
             Padding = new Padding(0, 0, 10, 0)
         };
 
@@ -391,7 +393,7 @@ public partial class MainForm : Form
             Text = DateTime.Now.ToString("HH:mm:ss"),
             ForeColor = Color.LightGray,
             Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter
+            TextAlign = System.Drawing.ContentAlignment.MiddleCenter
         };
         
         // Timer for clock update
@@ -457,7 +459,7 @@ public partial class MainForm : Form
         {
             Text = $"{node.Name} (ID:{node.Id})",
             Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleLeft,
+            TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
             Font = new Font("Segoe UI", 9, FontStyle.Bold)
         };
 
@@ -465,7 +467,7 @@ public partial class MainForm : Form
         {
             Text = "●",
             Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter,
+            TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
             Tag = node
         };
         UpdateNodeStatusColor(statusDot, node.Status);

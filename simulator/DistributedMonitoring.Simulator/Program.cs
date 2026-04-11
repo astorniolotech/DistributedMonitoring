@@ -1,5 +1,6 @@
 using MQTTnet;
 using MQTTnet.Client;
+using MQTTnet.Protocol;
 using System.Text;
 
 namespace DistributedMonitoring.Simulator;
