@@ -41,6 +41,6 @@ static class Program
         logService.LogSystem("Aplicacion iniciada");
 
         ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm(serviceProvider));
+        System.Windows.Forms.Application.Run(new MainForm(serviceProvider));
     }
 }
