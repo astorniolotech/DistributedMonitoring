@@ -1,6 +1,8 @@
+using System.Windows.Forms;
 using Microsoft.Extensions.DependencyInjection;
 using DistributedMonitoring.Application.Services;
 using DistributedMonitoring.Domain.Interfaces;
+using DistributedMonitoring.Infrastructure;
 using DistributedMonitoring.Infrastructure.MQTT;
 using DistributedMonitoring.Infrastructure.USB;
 using DistributedMonitoring.Infrastructure.Logging;
