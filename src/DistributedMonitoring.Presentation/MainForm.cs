@@ -3,8 +3,7 @@ using DistributedMonitoring.Domain.Interfaces;
 using DistributedMonitoring.Infrastructure.USB;
 using Microsoft.Extensions.DependencyInjection;
 using System.Windows.Forms;
-using System.Windows.Forms.VisualStyles;
-
+// FIX: eliminado "using System.Windows.Forms.VisualStyles" que causaba ambiguedad en ContentAlignment
 
 namespace DistributedMonitoring.Presentation;
 
@@ -16,7 +15,7 @@ public partial class MainForm : Form
     private readonly IMqttClientService _mqttService;
     private readonly ILogService _logService;
     private readonly IConfigurationService _configService;
-    private readonly ISerialPortService _serialPortService;
+    private readonly SerialPortService _serialPortService;
 
     private TableLayoutPanel? _mainLayout;
     private Panel? _nodesPanel;
@@ -34,7 +33,6 @@ public partial class MainForm : Form
     private Label? _mqttStatusLabel;
     private Label? _nodesStatusLabel;
     private Label? _lastUpdateLabel;
-    private DataGridView? _logsGrid;
 
     public MainForm(IServiceProvider serviceProvider)
     {
@@ -44,16 +42,18 @@ public partial class MainForm : Form
         _mqttService = serviceProvider.GetRequiredService<IMqttClientService>();
         _logService = serviceProvider.GetRequiredService<ILogService>();
         _configService = serviceProvider.GetRequiredService<IConfigurationService>();
-        _serialPortService = serviceProvider.GetRequiredService<ISerialPortService>();
+        _serialPortService = serviceProvider.GetRequiredService<SerialPortService>();
 
         InitializeComponent();
         SetupUI();
         LoadNodes();
 
-        // Subscribe to events
         _alarmService.AlarmTriggered += OnAlarmTriggered;
         _alarmService.AlarmSilenced += OnAlarmSilenced;
         _mqttService.MessageReceived += OnMqttMessageReceived;
+
+        // Conectar al broker al iniciar
+        _ = _mqttService.ConnectAsync();
     }
 
     private void InitializeComponent()
@@ -65,46 +65,34 @@ public partial class MainForm : Form
         this.Name = "MainForm";
         this.Text = "Sistema de Monitoreo Distribuido";
         this.StartPosition = FormStartPosition.CenterScreen;
+        this.BackColor = Color.FromArgb(37, 37, 38);
+        this.ForeColor = Color.White;
         this.FormClosing += OnFormClosing;
         this.ResumeLayout(false);
     }
 
     private void SetupUI()
     {
-        // Create main layout
         _mainLayout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             RowCount = 5,
             ColumnCount = 1,
-            Padding = new Padding(10)
+            Padding = new Padding(10),
+            BackColor = Color.FromArgb(37, 37, 38)
         };
 
-        _mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));   // Menu bar
-        _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));    // Nodes panel
-        _mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 80));   // Alarm panel
-        _mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 120));  // USB panel
-        _mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));   // Status bar
+        _mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+        _mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        _mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 80));
+        _mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 120));
+        _mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
 
-        // Menu bar
-        var menuPanel = CreateMenuBar();
-        _mainLayout.Controls.Add(menuPanel, 0, 0);
-
-        // Nodes panel
-        _nodesPanel = CreateNodesPanel();
-        _mainLayout.Controls.Add(_nodesPanel, 0, 1);
-
-        // Alarm panel
-        _alarmPanel = CreateAlarmPanel();
-        _mainLayout.Controls.Add(_alarmPanel, 0, 2);
-
-        // USB panel
-        _usbPanel = CreateUsbPanel();
-        _mainLayout.Controls.Add(_usbPanel, 0, 3);
-
-        // Status bar
-        _statusBar = CreateStatusBar();
-        _mainLayout.Controls.Add(_statusBar, 0, 4);
+        _mainLayout.Controls.Add(CreateMenuBar(), 0, 0);
+        _mainLayout.Controls.Add(CreateNodesPanel(), 0, 1);
+        _mainLayout.Controls.Add(CreateAlarmPanel(), 0, 2);
+        _mainLayout.Controls.Add(CreateUsbPanel(), 0, 3);
+        _mainLayout.Controls.Add(CreateStatusBar(), 0, 4);
 
         this.Controls.Add(_mainLayout);
     }
@@ -124,12 +112,13 @@ public partial class MainForm : Form
             Padding = new Padding(10, 5, 10, 5)
         };
 
+        // FIX: tipo explicito (string Text, EventHandler Handler) para evitar ambiguedad del compilador
         var buttons = new (string Text, EventHandler Handler)[]
         {
             ("Inicializar", OnInitializeNodes),
             ("Configurar", OnConfigure),
             ("Ver Logs", OnViewLogs),
-            ("Análisis", OnDataAnalysis),
+            ("Analisis", OnDataAnalysis),
             ("Salir", OnExit)
         };
 
@@ -159,6 +148,7 @@ public partial class MainForm : Form
         {
             Dock = DockStyle.Fill,
             BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.FromArgb(45, 45, 48),
             Padding = new Padding(10)
         };
 
@@ -166,6 +156,7 @@ public partial class MainForm : Form
         {
             Text = "NODOS",
             Dock = DockStyle.Top,
+            ForeColor = Color.White,
             Font = new Font("Segoe UI", 10, FontStyle.Bold),
             Padding = new Padding(0, 0, 0, 10)
         };
@@ -175,11 +166,12 @@ public partial class MainForm : Form
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = true,
-            AutoScroll = true
+            AutoScroll = true,
+            BackColor = Color.FromArgb(45, 45, 48)
         };
 
-        panel.Controls.Add(label);
         panel.Controls.Add(_nodeCardsPanel);
+        panel.Controls.Add(label);
         return panel;
     }
 
@@ -199,7 +191,6 @@ public partial class MainForm : Form
             RowCount = 1,
             ColumnCount = 2
         };
-
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 80));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
 
@@ -209,6 +200,7 @@ public partial class MainForm : Form
             Dock = DockStyle.Fill,
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 12),
+            // FIX: System.Drawing.ContentAlignment para evitar ambiguedad con VisualStyles
             TextAlign = System.Drawing.ContentAlignment.MiddleLeft
         };
 
@@ -227,7 +219,6 @@ public partial class MainForm : Form
 
         layout.Controls.Add(_alarmLabel, 0, 0);
         layout.Controls.Add(_silenceButton, 1, 0);
-
         panel.Controls.Add(layout);
         return panel;
     }
@@ -238,6 +229,7 @@ public partial class MainForm : Form
         {
             Dock = DockStyle.Fill,
             BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.FromArgb(45, 45, 48),
             Padding = new Padding(10)
         };
 
@@ -247,11 +239,10 @@ public partial class MainForm : Form
             RowCount = 2,
             ColumnCount = 1
         };
-
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
 
-        // Row 1: Port control
+        // Fila 1: control de puerto
         var portPanel = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.LeftToRight,
@@ -262,15 +253,13 @@ public partial class MainForm : Form
         {
             Text = "Puerto:",
             AutoSize = true,
+            ForeColor = Color.White,
             Margin = new Padding(0, 0, 10, 0),
+            // FIX: System.Drawing.ContentAlignment calificado explicitamente
             TextAlign = System.Drawing.ContentAlignment.MiddleLeft
         };
 
-        _portCombo = new ComboBox
-        {
-            Width = 150,
-            DropDownStyle = ComboBoxStyle.DropDownList
-        };
+        _portCombo = new ComboBox { Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
         RefreshPorts();
 
         _openPortButton = new Button
@@ -281,20 +270,12 @@ public partial class MainForm : Form
         };
         _openPortButton.Click += OnOpenPort;
 
-        var refreshPortsBtn = new Button
-        {
-            Text = "↻",
-            Width = 40,
-            Margin = new Padding(5, 0, 0, 0)
-        };
+        var refreshPortsBtn = new Button { Text = "↻", Width = 40, Margin = new Padding(5, 0, 0, 0) };
         refreshPortsBtn.Click += (s, e) => RefreshPorts();
 
-        portPanel.Controls.Add(portLabel);
-        portPanel.Controls.Add(_portCombo);
-        portPanel.Controls.Add(_openPortButton);
-        portPanel.Controls.Add(refreshPortsBtn);
+        portPanel.Controls.AddRange(new Control[] { portLabel, _portCombo, _openPortButton, refreshPortsBtn });
 
-        // Row 2: Recording controls
+        // Fila 2: controles de grabacion
         var recordPanel = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.LeftToRight,
@@ -303,22 +284,24 @@ public partial class MainForm : Form
 
         _startRecordButton = new Button
         {
-            Text = "▶ Iniciar Transmisión",
+            Text = "▶ Iniciar Transmision",
             Width = 160,
             Enabled = false,
             BackColor = Color.FromArgb(0, 100, 0),
-            ForeColor = Color.White
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
         };
         _startRecordButton.FlatAppearance.BorderSize = 0;
         _startRecordButton.Click += OnStartRecording;
 
         _stopRecordButton = new Button
         {
-            Text = "⏹ Detener Transmisión",
+            Text = "⏹ Detener Transmision",
             Width = 160,
             Enabled = false,
             BackColor = Color.FromArgb(100, 0, 0),
-            ForeColor = Color.White
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
         };
         _stopRecordButton.FlatAppearance.BorderSize = 0;
         _stopRecordButton.Click += OnStopRecording;
@@ -327,17 +310,15 @@ public partial class MainForm : Form
         {
             Text = "Estado: Cerrado | Registros: 0",
             AutoSize = true,
+            ForeColor = Color.White,
             Margin = new Padding(20, 0, 0, 0),
             TextAlign = System.Drawing.ContentAlignment.MiddleLeft
         };
 
-        recordPanel.Controls.Add(_startRecordButton);
-        recordPanel.Controls.Add(_stopRecordButton);
-        recordPanel.Controls.Add(_recordStatusLabel);
+        recordPanel.Controls.AddRange(new Control[] { _startRecordButton, _stopRecordButton, _recordStatusLabel });
 
         layout.Controls.Add(portPanel, 0, 0);
         layout.Controls.Add(recordPanel, 0, 1);
-
         panel.Controls.Add(layout);
         return panel;
     }
@@ -356,7 +337,6 @@ public partial class MainForm : Form
             RowCount = 1,
             ColumnCount = 4
         };
-
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
@@ -381,7 +361,7 @@ public partial class MainForm : Form
 
         _lastUpdateLabel = new Label
         {
-            Text = "Última actualización: --",
+            Text = "Ultima actualizacion: --",
             ForeColor = Color.LightGray,
             Dock = DockStyle.Fill,
             TextAlign = System.Drawing.ContentAlignment.MiddleRight,
@@ -395,10 +375,15 @@ public partial class MainForm : Form
             Dock = DockStyle.Fill,
             TextAlign = System.Drawing.ContentAlignment.MiddleCenter
         };
-        
-        // Timer for clock update
-        var timer = new Timer { Interval = 1000 };
-        timer.Tick += (s, e) => timeLabel.Text = DateTime.Now.ToString("HH:mm:ss");
+
+        var timer = new System.Windows.Forms.Timer { Interval = 1000 };
+        timer.Tick += (s, e) =>
+        {
+            timeLabel.Text = DateTime.Now.ToString("HH:mm:ss");
+            // Actualizar estado MQTT en la barra
+            _mqttStatusLabel.Text = _mqttService.IsConnected ? "MQTT: Conectado" : "MQTT: Desconectado";
+            _mqttStatusLabel.ForeColor = _mqttService.IsConnected ? Color.LimeGreen : Color.OrangeRed;
+        };
         timer.Start();
 
         layout.Controls.Add(_mqttStatusLabel, 0, 0);
@@ -412,13 +397,14 @@ public partial class MainForm : Form
 
     private void LoadNodes()
     {
-        _nodeCardsPanel?.Controls.Clear();
+        if (_nodeCardsPanel == null) return;
 
+        _nodeCardsPanel.Controls.Clear();
         var nodes = _nodeService.GetAllNodes();
+
         foreach (var node in nodes)
         {
-            var card = CreateNodeCard(node);
-            _nodeCardsPanel?.Controls.Add(card);
+            _nodeCardsPanel.Controls.Add(CreateNodeCard(node));
         }
 
         UpdateNodeCount();
@@ -428,11 +414,12 @@ public partial class MainForm : Form
     {
         var card = new Panel
         {
-            Width = 150,
-            Height = 100,
+            Width = 160,
+            Height = 110,
             BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.FromArgb(55, 55, 60),
             Margin = new Padding(5),
-            Tag = node
+            Tag = node.Id
         };
 
         var layout = new TableLayoutPanel
@@ -441,17 +428,12 @@ public partial class MainForm : Form
             RowCount = 3,
             ColumnCount = 1
         };
-
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
 
-        // Header: node name and status
-        var header = new TableLayoutPanel
-        {
-            RowCount = 1,
-            ColumnCount = 2
-        };
+        // Header
+        var header = new TableLayoutPanel { RowCount = 1, ColumnCount = 2, Dock = DockStyle.Fill };
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 80));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
 
@@ -459,8 +441,9 @@ public partial class MainForm : Form
         {
             Text = $"{node.Name} (ID:{node.Id})",
             Dock = DockStyle.Fill,
+            ForeColor = Color.White,
             TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
-            Font = new Font("Segoe UI", 9, FontStyle.Bold)
+            Font = new Font("Segoe UI", 8, FontStyle.Bold)
         };
 
         var statusDot = new Label
@@ -468,51 +451,36 @@ public partial class MainForm : Form
             Text = "●",
             Dock = DockStyle.Fill,
             TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
-            Tag = node
+            Tag = node.Id
         };
         UpdateNodeStatusColor(statusDot, node.Status);
 
         header.Controls.Add(nameLabel, 0, 0);
         header.Controls.Add(statusDot, 1, 0);
 
-        // Sensor values
+        // Valores de sensores
         var valuesLabel = new Label
         {
             Text = string.Join("\n", node.Sensors.Select(s => $"{s.Name}: {s.RawValue?.ToString("F1") ?? "--"} {s.Unit}")),
             Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI", 8)
-        };
-
-        // Actions
-        var actionsLayout = new FlowLayoutPanel
-        {
-            FlowDirection = FlowDirection.LeftToRight
-        };
-
-        var initBtn = new Button
-        {
-            Text = "Init",
-            Width = 45,
-            Height = 20,
+            ForeColor = Color.LightGray,
             Font = new Font("Segoe UI", 7)
         };
-        initBtn.Click += (s, e) => OnInitNode(node.Id);
 
-        var valuesBtn = new Button
-        {
-            Text = "Values",
-            Width = 50,
-            Height = 20,
-            Font = new Font("Segoe UI", 7)
-        };
-        valuesBtn.Click += (s, e) => OnRequestValues(node.Id);
+        // Acciones
+        var actionsLayout = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, Dock = DockStyle.Fill };
 
-        actionsLayout.Controls.Add(initBtn);
-        actionsLayout.Controls.Add(valuesBtn);
+        var initBtn = new Button { Text = "Init", Width = 45, Height = 22, Font = new Font("Segoe UI", 7) };
+        initBtn.Click += (s, e) => _ = _nodeService.InitializeNodeAsync(node.Id);
+
+        var valuesBtn = new Button { Text = "Values", Width = 55, Height = 22, Font = new Font("Segoe UI", 7) };
+        valuesBtn.Click += (s, e) => _ = _nodeService.RequestValuesAsync(node.Id);
+
+        actionsLayout.Controls.AddRange(new Control[] { initBtn, valuesBtn });
 
         layout.Controls.Add(header, 0, 0);
-        layout.Controls.Add(valuesLabel, 1, 0);
-        layout.Controls.Add(actionsLayout, 2, 0);
+        layout.Controls.Add(valuesLabel, 0, 1);
+        layout.Controls.Add(actionsLayout, 0, 2);
 
         card.Controls.Add(layout);
         return card;
@@ -520,7 +488,6 @@ public partial class MainForm : Form
 
     private void UpdateNodeStatusColor(Label dot, NodeStatus status)
     {
-        dot.Text = "●";
         dot.ForeColor = status switch
         {
             NodeStatus.Active => Color.LimeGreen,
@@ -532,54 +499,51 @@ public partial class MainForm : Form
 
     private void UpdateNodeCount()
     {
-        var nodes = _nodeService.GetAllNodes();
+        var nodes = _nodeService.GetAllNodes().ToList();
         var activeCount = nodes.Count(n => n.Status == NodeStatus.Active);
-        _nodesStatusLabel!.Text = $"Nodos: {activeCount}/{nodes.Count()}";
+        if (_nodesStatusLabel != null)
+            _nodesStatusLabel.Text = $"Nodos: {activeCount}/{nodes.Count}";
     }
 
     private void RefreshPorts()
     {
-        _portCombo!.Items.Clear();
+        if (_portCombo == null) return;
+        _portCombo.Items.Clear();
         var ports = _serialPortService.GetAvailablePorts();
         _portCombo.Items.AddRange(ports);
         if (ports.Length > 0)
             _portCombo.SelectedIndex = 0;
     }
 
-    // Event handlers
+    // --- Event handlers ---
+
     private async void OnInitializeNodes(object? sender, EventArgs e)
     {
-        var nodes = _nodeService.GetAllNodes();
-        foreach (var node in nodes)
+        foreach (var node in _nodeService.GetAllNodes().Where(n => n.IsEnabled))
         {
-            if (node.IsEnabled)
-            {
-                await _nodeService.InitializeNodeAsync(node.Id);
-            }
+            await _nodeService.InitializeNodeAsync(node.Id);
         }
     }
 
     private void OnConfigure(object? sender, EventArgs e)
     {
-        MessageBox.Show("Ventana de configuración - pendiente de implementación", "Configurar", MessageBoxButtons.OK);
+        MessageBox.Show("Ventana de configuracion - pendiente de implementacion", "Configurar", MessageBoxButtons.OK);
     }
 
     private void OnViewLogs(object? sender, EventArgs e)
     {
         var logs = _logService.GetRecentLogs(100);
         var logText = string.Join("\n", logs.Select(l => $"{l.Timestamp:HH:mm:ss} | {l.Category} | {l.Message}"));
-        MessageBox.Show(logText, "Archivo de Novedades", MessageBoxButtons.OK);
+        MessageBox.Show(string.IsNullOrEmpty(logText) ? "Sin eventos registrados." : logText,
+            "Archivo de Novedades", MessageBoxButtons.OK);
     }
 
     private void OnDataAnalysis(object? sender, EventArgs e)
     {
-        MessageBox.Show("Ventana de análisis de datos - pendiente de implementación", "Análisis", MessageBoxButtons.OK);
+        MessageBox.Show("Ventana de analisis de datos - pendiente de implementacion", "Analisis", MessageBoxButtons.OK);
     }
 
-    private void OnExit(object? sender, EventArgs e)
-    {
-        Close();
-    }
+    private void OnExit(object? sender, EventArgs e) => Close();
 
     private async void OnOpenPort(object? sender, EventArgs e)
     {
@@ -640,60 +604,42 @@ public partial class MainForm : Form
 
     private async void OnSilenceAlarm(object? sender, EventArgs e)
     {
-        await _alarmService.SilencesSirenAsync();
-    }
-
-    private void OnInitNode(int nodeId)
-    {
-        _ = _nodeService.InitializeNodeAsync(nodeId);
-    }
-
-    private void OnRequestValues(int nodeId)
-    {
-        _ = _nodeService.RequestValuesAsync(nodeId);
+        await _alarmService.SilenceSirenAsync();
     }
 
     private void OnAlarmTriggered(object? sender, Alarm alarm)
     {
-        if (InvokeRequired)
-        {
-            Invoke(new Action(() => OnAlarmTriggered(sender, alarm)));
-            return;
-        }
+        // FIX: siempre invocar en el hilo UI correctamente
+        if (InvokeRequired) { Invoke(() => OnAlarmTriggered(sender, alarm)); return; }
 
         _alarmLabel!.Text = $"⚠️ ALARMA: {alarm.Description}";
-        _alarmLabel!.ForeColor = Color.Red;
+        _alarmLabel.ForeColor = Color.Red;
         _silenceButton!.Enabled = true;
     }
 
     private void OnAlarmSilenced(object? sender, EventArgs e)
     {
-        if (InvokeRequired)
-        {
-            Invoke(new Action(() => OnAlarmSilenced(sender, e)));
-            return;
-        }
+        if (InvokeRequired) { Invoke(() => OnAlarmSilenced(sender, e)); return; }
 
         _alarmLabel!.Text = "Alarma silenciada";
-        _alarmLabel!.ForeColor = Color.Orange;
+        _alarmLabel.ForeColor = Color.Orange;
         _silenceButton!.Enabled = false;
     }
 
     private void OnMqttMessageReceived(object? sender, MqttMessageReceivedEventArgs e)
     {
-        // Parse and process MQTT messages
-        _lastUpdateLabel!.Text = $"Última actualización: {DateTime.Now:HH:mm:ss}";
-        
-        // TODO: Parse protocol message and update node data
-        _ = Task.Run(() => LoadNodes()); // Refresh UI
+        if (InvokeRequired) { Invoke(() => OnMqttMessageReceived(sender, e)); return; }
+
+        _lastUpdateLabel!.Text = $"Ultima actualizacion: {DateTime.Now:HH:mm:ss}";
+
+        // FIX: LoadNodes se llama en el hilo UI directamente, no en Task.Run
+        LoadNodes();
     }
 
     private async void OnFormClosing(object? sender, FormClosingEventArgs e)
     {
         await _mqttService.DisconnectAsync();
         if (_serialPortService.IsOpen)
-        {
             await _serialPortService.CloseAsync();
-        }
     }
 }

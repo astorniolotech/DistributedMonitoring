@@ -11,6 +11,7 @@ public class AlarmService
     private readonly object _lock = new();
     private bool _sirenActive;
     private bool _sirenSilenced;
+    private int _nextAlarmId = 1; // FIX: usar contador en lugar de DateTime.Ticks (evita overflow long->int)
 
     public event EventHandler<Alarm>? AlarmTriggered;
     public event EventHandler? AlarmSilenced;
@@ -30,8 +31,13 @@ public class AlarmService
         if (!sensor.IsEnabled) return;
 
         var limits = sensor.Limits;
-        SensorState newState;
 
+        // FIX: guardar estado anterior ANTES de asignar el nuevo
+        // Bug original: sensor.State = newState se ejecutaba antes de la comparacion,
+        // por lo que newState != sensor.State siempre era false y nunca se disparaba la alarma
+        var previousState = sensor.State;
+
+        SensorState newState;
         if (value < limits.RawLowAlarm)
             newState = SensorState.LowAlarm;
         else if (value > limits.RawHighAlarm)
@@ -45,8 +51,8 @@ public class AlarmService
 
         sensor.State = newState;
 
-        // Only trigger alarm on state change
-        if (newState != SensorState.OK && newState != sensor.State)
+        // Solo disparar alarma si el estado cambio y no es OK
+        if (newState != SensorState.OK && newState != previousState)
         {
             var alarmType = newState switch
             {
@@ -73,7 +79,7 @@ public class AlarmService
         {
             var alarm = new Alarm
             {
-                Id = (int)DateTime.Now.Ticks,
+                Id = _nextAlarmId++, // FIX: contador incremental thread-safe dentro del lock
                 Type = type,
                 Level = level,
                 NodeId = nodeId,
@@ -87,51 +93,56 @@ public class AlarmService
             _activeAlarms.Add(alarm);
             _logService.LogAlarm($"Alarma: {description}", nodeId);
 
-            // Activate siren for Alarm level
+            // Activar sirena solo para nivel Alarm y si no esta silenciada
             if (level == AlarmLevel.Alarm && !_sirenSilenced)
             {
-                ActivateSiren();
+                _ = ActivateSirenAsync(); // FIX: async Task en lugar de async void
             }
 
             AlarmTriggered?.Invoke(this, alarm);
         }
     }
 
-    private async void ActivateSiren()
+    // FIX: convertido de async void a async Task para que las excepciones no sean silenciadas
+    private async Task ActivateSirenAsync()
     {
         if (_sirenActive) return;
-        
+
         _sirenActive = true;
         var sirenNodeId = _configService.GetConfiguration().Alarm.SirenNodeId;
-        
+
         try
         {
             await _mqttService.PublishAsync($"NodoSensor/{sirenNodeId}", "ALARM_ON");
         }
-        catch
+        catch (Exception ex)
         {
-            // Log but don't crash
+            _logService.LogCommunication($"Error activando sirena: {ex.Message}");
         }
     }
 
-    public async Task SilencesSirenAsync()
+    public async Task SilenceSirenAsync()
     {
-        _sirenSilenced = true;
-        
-        foreach (var alarm in _activeAlarms)
+        lock (_lock)
         {
-            alarm.IsSilenced = true;
+            _sirenSilenced = true;
+            _sirenActive = false;
+
+            foreach (var alarm in _activeAlarms)
+            {
+                alarm.IsSilenced = true;
+            }
         }
 
         var sirenNodeId = _configService.GetConfiguration().Alarm.SirenNodeId;
-        
+
         try
         {
             await _mqttService.PublishAsync($"NodoSensor/{sirenNodeId}", "ALARM_OFF");
         }
-        catch
+        catch (Exception ex)
         {
-            // Log but don't crash
+            _logService.LogCommunication($"Error silenciando sirena: {ex.Message}");
         }
 
         _logService.LogAlarm("Alarma silenciada por operador");

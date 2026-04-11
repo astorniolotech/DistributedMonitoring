@@ -11,6 +11,7 @@ public class SerialPortService : ISerialPortService, IDisposable
     private bool _isRecording;
     private StreamWriter? _recordingWriter;
     private string? _recordingPath;
+    // FIX: eliminado _reconnectTimer que estaba declarado sin uso y causaba error en Dispose()
 
     public bool IsOpen => _serialPort?.IsOpen ?? false;
     public bool IsRecording => _isRecording;
@@ -46,8 +47,10 @@ public class SerialPortService : ISerialPortService, IDisposable
 
         _serialPort.DataReceived += OnDataReceived;
         _serialPort.Open();
-        
+
         _logService.LogSystem($"Puerto serie {portName} abierto");
+
+        await Task.CompletedTask; // mantener firma async para la interfaz
     }
 
     private void OnDataReceived(object sender, SerialDataReceivedEventArgs e)
@@ -55,18 +58,15 @@ public class SerialPortService : ISerialPortService, IDisposable
         try
         {
             var data = _serialPort!.ReadExisting();
-            
-            // Handle recording
+
             if (_isRecording && _recordingWriter != null)
             {
-                // Parse and save data
-                // Format: $TIMESTAMP,NODEID,S1,S2,S3,S4#
-                if (data.Contains("$") && data.Contains("#"))
+                if (data.Contains('$') && data.Contains('#'))
                 {
                     var lines = data.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     foreach (var line in lines)
                     {
-                        if (line.Contains("$") && line.Contains("#"))
+                        if (line.Contains('$') && line.Contains('#'))
                         {
                             _recordingWriter.WriteLine($"{DateTime.Now:O},{line.Trim()}");
                         }
@@ -91,8 +91,9 @@ public class SerialPortService : ISerialPortService, IDisposable
 
         if (_serialPort?.IsOpen == true)
         {
+            _serialPort.DataReceived -= OnDataReceived;
             _serialPort.Close();
-            _logService.LogSystem($"Puerto serie cerrado");
+            _logService.LogSystem("Puerto serie cerrado");
         }
     }
 
@@ -123,13 +124,12 @@ public class SerialPortService : ISerialPortService, IDisposable
         }
 
         _recordingPath = filePath;
-        _recordingWriter = new StreamWriter(filePath, true);
-        
-        // Write CSV header
+        _recordingWriter = new StreamWriter(filePath, append: true);
+
         await _recordingWriter.WriteLineAsync("Timestamp,NodeId,Sensor1,Sensor2,Sensor3,Sensor4");
-        
+
         _isRecording = true;
-        _logService.LogSystem($"Grabación iniciada: {filePath}");
+        _logService.LogSystem($"Grabacion iniciada: {filePath}");
     }
 
     public async Task StopRecordingAsync()
@@ -137,7 +137,7 @@ public class SerialPortService : ISerialPortService, IDisposable
         if (!_isRecording) return;
 
         _isRecording = false;
-        
+
         if (_recordingWriter != null)
         {
             await _recordingWriter.FlushAsync();
@@ -145,7 +145,7 @@ public class SerialPortService : ISerialPortService, IDisposable
             _recordingWriter = null;
         }
 
-        _logService.LogSystem($"Grabación finalizada: {_recordingPath}");
+        _logService.LogSystem($"Grabacion finalizada: {_recordingPath}");
     }
 
     public async Task SendStartCommandAsync()
@@ -162,10 +162,7 @@ public class SerialPortService : ISerialPortService, IDisposable
 
     public void Dispose()
     {
-        _reconnectTimer?.Dispose();
         _recordingWriter?.Dispose();
         _serialPort?.Dispose();
     }
-
-    private Timer? _reconnectTimer;
 }

@@ -26,8 +26,6 @@ public class MqttClientService : IMqttClientService, IDisposable
 
     public async Task ConnectAsync()
     {
-        if (_isConnecting) return;
-        
         lock (_lock)
         {
             if (_isConnecting) return;
@@ -37,7 +35,7 @@ public class MqttClientService : IMqttClientService, IDisposable
         try
         {
             var config = _configService.GetConfiguration();
-            
+
             var factory = new MqttFactory();
             _mqttClient = factory.CreateMqttClient();
 
@@ -49,38 +47,42 @@ public class MqttClientService : IMqttClientService, IDisposable
                 .Build();
 
             _mqttClient.ApplicationMessageReceivedAsync += OnMessageReceivedAsync;
+            _mqttClient.DisconnectedAsync += OnDisconnectedAsync;
 
             await _mqttClient.ConnectAsync(options);
-            
+
             _logService.LogSystem($"Conectado al broker MQTT {config.Broker.Host}:{config.Broker.Port}");
-            
-            // Subscribe to topics
+
             await SubscribeAsync("NodoPpal");
-            
-            lock (_lock)
-            {
-                _isConnecting = false;
-            }
         }
         catch (Exception ex)
         {
             _logService.LogCommunication($"Error al conectar al broker MQTT: {ex.Message}");
-            
+            StartReconnectTimer();
+        }
+        finally
+        {
             lock (_lock)
             {
                 _isConnecting = false;
             }
-            
-            // Start reconnection timer
-            StartReconnectTimer();
         }
+    }
+
+    private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs e)
+    {
+        _logService.LogCommunication("Desconectado del broker MQTT. Reintentando...");
+        StartReconnectTimer();
+        return Task.CompletedTask;
     }
 
     private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)
     {
         var topic = e.ApplicationMessage.Topic;
-        var payload = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
-        
+
+        // FIX: usar PayloadSegment en lugar de Payload (Payload esta obsoleto en MQTTnet v4)
+        var payload = Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment);
+
         MessageReceived?.Invoke(this, new MqttMessageReceivedEventArgs
         {
             Topic = topic,
@@ -99,13 +101,14 @@ public class MqttClientService : IMqttClientService, IDisposable
             {
                 await ConnectAsync();
             }
-        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
     }
 
     public async Task DisconnectAsync()
     {
         _reconnectTimer?.Dispose();
-        
+        _reconnectTimer = null;
+
         if (_mqttClient?.IsConnected == true)
         {
             await _mqttClient.DisconnectAsync();
@@ -152,7 +155,7 @@ public class MqttClientService : IMqttClientService, IDisposable
     }
 }
 
-// Simple in-memory implementation of INodeRepository
+// Implementacion en memoria de INodeRepository
 public class NodeRepository : INodeRepository
 {
     private readonly Dictionary<int, Node> _nodes = new();
@@ -168,7 +171,7 @@ public class NodeRepository : INodeRepository
     private void InitializeNodes()
     {
         var config = _configService.GetConfiguration();
-        
+
         foreach (var nodeConfig in config.Nodes)
         {
             var node = new Node
@@ -186,7 +189,7 @@ public class NodeRepository : INodeRepository
                     Limits = s.Limits
                 }).ToList()
             };
-            
+
             _nodes[node.Id] = node;
         }
     }
@@ -216,7 +219,7 @@ public class NodeRepository : INodeRepository
     }
 }
 
-// Simple in-memory message bus
+// Message bus en memoria
 public class MessageBus : IMessageBus
 {
     private readonly Dictionary<Type, List<Delegate>> _handlers = new();
@@ -228,25 +231,27 @@ public class MessageBus : IMessageBus
         {
             var type = typeof(T);
             if (!_handlers.ContainsKey(type))
-            {
                 _handlers[type] = new List<Delegate>();
-            }
+
             _handlers[type].Add(handler);
         }
     }
 
     public void Publish<T>(T message)
     {
+        List<Delegate> handlers;
         lock (_lock)
         {
             var type = typeof(T);
-            if (_handlers.TryGetValue(type, out var handlers))
-            {
-                foreach (var handler in handlers)
-                {
-                    ((Action<T>)handler)(message);
-                }
-            }
+            if (!_handlers.TryGetValue(type, out var found))
+                return;
+
+            handlers = new List<Delegate>(found); // copiar para evitar deadlock
+        }
+
+        foreach (var handler in handlers)
+        {
+            ((Action<T>)handler)(message);
         }
     }
 }
