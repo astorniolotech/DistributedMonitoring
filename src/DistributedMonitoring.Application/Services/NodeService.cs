@@ -1,5 +1,4 @@
 using DistributedMonitoring.Domain.Interfaces;
-using DistributedMonitoring.Infrastructure.Protocol;
 
 namespace DistributedMonitoring.Application.Services;
 
@@ -9,22 +8,24 @@ public class NodeService
     private readonly IMqttClientService _mqttService;
     private readonly ILogService _logService;
     private readonly AlarmService _alarmService;
+    private readonly IProtocolParser _protocolParser;
     private readonly SystemConfiguration _systemConfig;
     private readonly Dictionary<int, Timer> _offlineTimers = new();
     private readonly object _lock = new();
-    private readonly ProtocolParser _protocolParser = new();
 
     public NodeService(
         INodeRepository nodeRepository,
         IMqttClientService mqttService,
         ILogService logService,
         IConfigurationService configService,
-        AlarmService alarmService)
+        AlarmService alarmService,
+        IProtocolParser protocolParser)
     {
         _nodeRepository = nodeRepository;
         _mqttService = mqttService;
         _logService = logService;
         _alarmService = alarmService;
+        _protocolParser = protocolParser;
         _systemConfig = configService.GetConfiguration().System;
 
         // Suscribirse a mensajes MQTT

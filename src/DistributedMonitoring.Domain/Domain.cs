@@ -49,6 +49,14 @@ public interface ISerialPortService
     event EventHandler<string>? DataReceived;
 }
 
+public interface IProtocolParser
+{
+    SensorMessage? Parse(string rawMessage);
+    string BuildCommand(int nodeId, string command);
+    string BuildInitBroadcast();
+    bool ValidateFormat(string message);
+}
+
 // DTOs for configuration
 public class AppConfiguration
 {

@@ -8,7 +8,40 @@ namespace DistributedMonitoring.Infrastructure;
 public class NodeRepository : INodeRepository
 {
     private readonly Dictionary<int, Node> _nodes = new();
+    private readonly IConfigurationService _configService;
     private readonly object _lock = new();
+
+    public NodeRepository(IConfigurationService configService)
+    {
+        _configService = configService;
+        InitializeNodes();
+    }
+
+    private void InitializeNodes()
+    {
+        var config = _configService.GetConfiguration();
+
+        foreach (var nodeConfig in config.Nodes)
+        {
+            var node = new Node
+            {
+                Id = nodeConfig.Id,
+                Name = nodeConfig.Name,
+                IsEnabled = nodeConfig.Enabled,
+                Status = NodeStatus.Unknown,
+                Sensors = nodeConfig.Sensors.Select(s => new Sensor
+                {
+                    Id = s.Id,
+                    Name = s.Name,
+                    Unit = s.Unit,
+                    IsEnabled = true,
+                    Limits = s.Limits
+                }).ToList()
+            };
+
+            _nodes[node.Id] = node;
+        }
+    }
 
     public Node? GetNode(int id)
     {

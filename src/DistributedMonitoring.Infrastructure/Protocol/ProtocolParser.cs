@@ -6,7 +6,7 @@ namespace DistributedMonitoring.Infrastructure.Protocol;
 /// Parser for sensor node protocol messages
 /// Format: $TYPE,NODEID,S1,S2,S3,S4,STATUS,FLAGS*CHECKSUM#
 /// </summary>
-public class ProtocolParser
+public class ProtocolParser : IProtocolParser
 {
     private const char StartMarker = '$';
     private const char EndMarker = '#';

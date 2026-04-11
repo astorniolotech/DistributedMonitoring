@@ -7,6 +7,7 @@ using DistributedMonitoring.Infrastructure.MQTT;
 using DistributedMonitoring.Infrastructure.USB;
 using DistributedMonitoring.Infrastructure.Logging;
 using DistributedMonitoring.Infrastructure.Configuration;
+using DistributedMonitoring.Infrastructure.Protocol;
 
 namespace DistributedMonitoring.Presentation;
 
@@ -23,6 +24,7 @@ static class Program
         services.AddSingleton<INodeRepository, NodeRepository>();
         services.AddSingleton<ILogService, LogService>();
         services.AddSingleton<IMqttClientService, MqttClientService>();
+        services.AddSingleton<IProtocolParser, ProtocolParser>();
         // FIX: registrar SerialPortService tanto como interfaz como como tipo concreto
         // para que MainForm pueda acceder a metodos especificos (GetAvailablePorts, StartRecordingAsync, etc.)
         services.AddSingleton<SerialPortService>();
