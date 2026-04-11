@@ -40,7 +40,7 @@ static class Program
         var logService = serviceProvider.GetRequiredService<ILogService>();
         logService.LogSystem("Aplicacion iniciada");
 
-        System.Windows.Forms.ApplicationConfiguration.Initialize();
+        ApplicationConfiguration.Initialize();
         System.Windows.Forms.Application.Run(new MainForm(serviceProvider));
     }
 }
